@@ -11,16 +11,17 @@ body {
 #gameCanvas {
     border: 1px solid #fff;
     background-color: #222;
-    width: 80vw; /* 모바일 responsive */
-    height: 60vh;
+    width: 90vw; /* 가로 넓게 */
+    height: 50vh; /* 세로 좁게 */
     max-width: 800px;
-    max-height: 600px;
+    max-height: 400px;
 }
 
 #controls {
     display: flex;
+    flex-direction: row; /* 가로 배치 */
     justify-content: space-around;
-    width: 80vw;
+    width: 90vw;
     margin-top: 10px;
 }
 
@@ -33,7 +34,15 @@ button {
     cursor: pointer;
 }
 
-@media (min-width: 768px) {
-    /* PC에서 버튼 숨기기 또는 키보드 입력 우선 */
-    #controls { display: none; } /* PC는 키보드 사용 */
+@media (orientation: portrait) {
+    body::before {
+        content: "가로 모드로 플레이해주세요!";
+        color: #fff;
+        font-size: 24px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    #gameCanvas, #controls { display: none; } /* 세로 시 숨김 */
 }
