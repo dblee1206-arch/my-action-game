@@ -1,0 +1,39 @@
+body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #000;
+}
+
+#gameCanvas {
+    border: 1px solid #fff;
+    background-color: #222;
+    width: 80vw; /* 모바일 responsive */
+    height: 60vh;
+    max-width: 800px;
+    max-height: 600px;
+}
+
+#controls {
+    display: flex;
+    justify-content: space-around;
+    width: 80vw;
+    margin-top: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 18px;
+    background-color: #444;
+    color: #fff;
+    border: 1px solid #fff;
+    cursor: pointer;
+}
+
+@media (min-width: 768px) {
+    /* PC에서 버튼 숨기기 또는 키보드 입력 우선 */
+    #controls { display: none; } /* PC는 키보드 사용 */
+}
