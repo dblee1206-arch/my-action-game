@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D 액션 파링 게임</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial; }
+        #game { border: 2px solid #fff; }
+    </style>
+</head>
+<body>
+    <script>
+        class GameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'GameScene' });
+            }
+
+            create() {
+                // 배경
+                this.add.rectangle(400, 300, 800, 600, 0x222244).setOrigin(0.5);
+
+                // 플레이어 (파란색)
+                this.player = this.add.rectangle(250, 350, 80, 120, 0x4488ff).setOrigin(0.5);
+                this.playerHP = 100;
+                this.maxHP = 100;
+                this.playerHPBarBg = this.add.rectangle(100, 80, 200, 25, 0x333333).setOrigin(0.5);
+                this.playerHPBar = this.add.rectangle(100, 80, 200, 25, 0x00ff44).setOrigin(0.5);
+
+                // 적 (빨간색)
+                this.enemy = this.add.rectangle(550, 350, 80, 120, 0xff4444).setOrigin(0.5);
+                this.enemyHP = 100;
+                this.enemyHPBarBg = this.add.rectangle(700, 80, 200, 25, 0x333333).setOrigin(0.5);
+                this.enemyHPBar = this.add.rectangle(700, 80, 200, 25, 0xff4444).setOrigin(0.5);
+
+                // 프롬프트 텍스트
+                this.prompt = this.add.text(400, 200, '준비! 적 공격을 기다려...', { fontSize: '24px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+
+                // 버튼들 (모바일 터치 + PC 클릭)
+                const btnConfig = { strokeWidth: 4, strokeColor: 0x000000, fillColor: 0xcccccc };
+                this.attackBtn = this.add.rectangle(150, 520, 100, 60, btnConfig.fillColor).setStrokeStyle(btnConfig.strokeWidth, btnConfig.strokeColor).setInteractive();
+                this.attackText = this.add.text(150, 520, '공격\n(A)', { fontSize: '18px', color: '#000' }).setOrigin(0.5);
+                this.parryBtn = this.add.rectangle(280, 520, 100, 60, btnConfig.fillColor).setStrokeStyle(btnConfig.strokeWidth, btnConfig.strokeColor).setInteractive();
+                this.parryText = this.add.text(280, 520, '패링\n(P)', { fontSize: '18px', color: '#000' }).setOrigin(0.5);
+                this.dodgeBtn = this.add.rectangle(410, 520, 100, 60, btnConfig.fillColor).setStrokeStyle(btnConfig.strokeWidth, btnConfig.strokeColor).setInteractive();
+                this.dodgeText = this.add.text(410, 520, '대쉬\n(D)', { fontSize: '18px', color: '#000' }).setOrigin(0.5);
+
+                // 버튼 이벤트 (터치/클릭)
+                this.attackBtn.on('pointerdown', () => this.playerAction('attack'));
+                this.parryBtn.on('pointerdown', () => this.playerAction('parry'));
+                this.dodgeBtn.on('pointerdown', () => this.playerAction('dodge'));
+
+                // 키보드 이벤트
+                this.keys = this.input.keyboard.addKeys('A,P,D');
+
+                // 게임 상태
+                this.enemyAttacking = false;
+                this.attackStartTime = 0;
+                this.parryWindowStart = 500; // ms
+                this.parryWindowEnd = 1000;  // ms
+                this.gameOver = false;
+
+                // 적 AI: 2~4초 랜덤 간격으로 공격
+                this.enemyAttackTimer = this.time.addEvent({
+                    delay: Phaser.Math.Between(2000, 4000),
+                    callback: this.enemyAttack,
+                    callbackScope: this,
+                    loop: true
+                });
+
+                // HP 업데이트 함수
+                this.updateHP = function() {
+                    // 플레이어 HP 바
+                    const playerBarWidth = (this.playerHP / this.maxHP) * 200;
+                    this.playerHPBar.setScaleX(playerBarWidth / 200).setX(100 + (100 - playerBarWidth / 2));
+
+                    // 적 HP 바
+                    const enemyBarWidth = (this.enemyHP / this.maxHP) * 200;
+                    this.enemyHPBar.setScaleX(enemyBarWidth / 200).setX(700 + (100 - enemyBarWidth / 2));
+
+                    // 색상 변경
+                    if (this.playerHP < 50) this.playerHPBar.setFillStyle(0xffaa00);
+                    if (this.playerHP < 25) this.playerHPBar.setFillStyle(0xff4444);
+                    if (this.enemyHP < 50) this.enemyHPBar.setFillStyle(0xffaa00);
+                    if (this.enemyHP < 25) this.enemyHPBar.setFillStyle(0x4488ff);
+                }.bind(this);
+
+                this.updateHP(); // 초기
+            }
+
+            update() {
+                if (this.gameOver) return;
+
+                // 키보드 입력 (한 프레임에 한 번만)
+                if (Phaser.Input.Keyboard.JustDown(this.keys.A)) this.playerAction('attack');
+                if (Phaser.Input.Keyboard.JustDown(this.keys.P)) this.playerAction('parry');
+                if (Phaser.Input.Keyboard.JustDown(this.keys.D)) this.playerAction('dodge');
+
+                // 게임 오버 체크
+                if (this.playerHP <= 0) {
+                    this.prompt.setText('패배! 새로고침해서 다시!');
+                    this.gameOver = true;
+                    return;
+                }
+                if (this.enemyHP <= 0) {
+                    this.prompt.setText('승리! 새로고침해서 다시!');
+                    this.gameOver = true;
+                    return;
+                }
+            }
+
+            enemyAttack() {
+                if (this.enemyAttacking || this.gameOver) return;
+                this.enemyAttacking = true;
+                this.attackStartTime = this.time.now;
+                this.prompt.setText('적 공격! 패링(500~1000ms) or 대쉬!');
+
+                // 적 공격 애니 (진행)
+                this.tweens.add({
+                    targets: this.enemy,
+                    x: '+=60',
+                    duration: 800,
+                    yoyo: true,
+                    ease: 'Power2'
+                });
+
+                // 공격 끝나면 자동 데미지 (패링/대쉬 실패 시)
+                this.time.delayedCall(1500, () => {
+                    if (this.enemyAttacking) {
+                        this.playerHP -= 20;
+                        this.prompt.setText('데미지!');
+                        this.updateHP();
+                        this.endEnemyAttack();
+                    }
+                }, [], this);
+            }
+
+            playerAction(action) {
+                if (this.gameOver) return;
+
+                const elapsed = this.time.now - this.attackStartTime;
+
+                if (!this.enemyAttacking) {
+                    // 적 안 공격중: 플레이어 공격
+                    if (action === 'attack') {
+                        this.enemyHP -= 15;
+                        this.prompt.setText('플레이어 공격! 힛!');
+                        this.tweens.add({
+                            targets: this.player,
+                            x: '+=60',
+                            duration: 300,
+                            yoyo: true
+                        });
+                        this.updateHP();
+                    }
+                    return;
+                }
+
+                // 적 공격중
+                if (elapsed >= this.parryWindowStart && elapsed <= this.parryWindowEnd) {
+                    // 타이밍 성공
+                    if (action === 'parry') {
+                        this.prompt.setText('패링 성공! 반격!');
+                        this.enemyHP -= 25;
+                        this.tweens.add({
+                            targets: this.enemy,
+                            scale: 1.2,
+                            duration: 200,
+                            yoyo: true
+                        });
+                    } else if (action === 'dodge') {
+                        this.prompt.setText('대쉬 성공! 완벽 회피!');
+                        this.tweens.add({
+                            targets: this.player,
+                            x: '-=80',
+                            duration: 300,
+                            yoyo: true
+                        });
+                    } else {
+                        // 공격은 무시 or 약간 데미지
+                        this.playerHP -= 5;
+                        this.prompt.setText('공격은 무용! 타이밍 놓침');
+                    }
+                } else {
+                    // 타이밍 실패
+                    this.playerHP -= 10;
+                    this.prompt.setText('타이밍 실패! 데미지');
+                }
+
+                this.updateHP();
+                this.endEnemyAttack();
+            }
+
+            endEnemyAttack() {
+                this.enemyAttacking = false;
+                this.prompt.setText('다음 공격 기다려...');
+                // 다음 타이머 재시작
+                this.enemyAttackTimer.remove();
+                this.enemyAttackTimer = this.time.addEvent({
+                    delay: Phaser.Math.Between(2000, 4000),
+                    callback: this.enemyAttack,
+                    callbackScope: this,
+                    loop: false
+                });
+            }
+        }
+
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            backgroundColor: '#000000',
+            scene: GameScene
+        };
+
+        new Phaser.Game(config);
+    </script>
+</body>
+</html>
