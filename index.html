@@ -1,21 +1,23 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D 액션 게임</title>
+    <title>2D Action Game</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div id="controls">
-        <!-- 모바일 터치 버튼 -->
-        <button id="leftBtn">◀</button>
-        <button id="rightBtn">▶</button>
+    <div id="prologue" class="overlay">
+        <h1>스토리 프롤로그</h1>
+        <p>대충 뭔가 있어 보이는 말.</p>
+        <button onclick="startGame()">시작하기</button>
+    </div>
+    <div id="controls" class="controls">
         <button id="attackBtn">공격</button>
         <button id="parryBtn">패링</button>
-        <button id="dodgeBtn">회피</button>
+        <button id="dashBtn">회피</button>
     </div>
-    <script src="game.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
