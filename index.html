@@ -1,23 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
+<<!DOCTYPE html>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D Action Game</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>리듬 게임</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.js"></script>  <!-- Phaser 3 최신 -->
+    <style> body { margin: 0; padding: 0; background: black; } </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="prologue" class="overlay">
-        <h1>스토리 프롤로그</h1>
-        <p>대충 뭔가 있어 보이는 말.</p>
-        <button onclick="startGame()">시작하기</button>
-    </div>
-    <div id="controls" class="controls">
-        <button id="attackBtn">공격</button>
-        <button id="parryBtn">패링</button>
-        <button id="dashBtn">회피</button>
-    </div>
-    <script src="script.js"></script>
+    <script>
+        var config = {
+            type: Phaser.AUTO,
+            width: 800,  // 가로 기준
+            height: 600,
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                orientationTarget: 1  // 1=가로 고정! 모바일에서 세로면 돌아가라고 팝업 뜸
+            },
+            input: {
+                touch: true,  // 모바일 터치 켜기
+                mouse: true
+            },
+            backgroundColor: '#000000',
+            physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+            scene: { preload: preload, create: create, update: update }
+        };
+
+        var game = new Phaser.Game(config);
+        var notes = [];  // 노트 배열
+        var hitZone;     // 히트 존 (터치할 곳)
+        var music;       // 음악
+        var bpm = 120;   // 분당 비트 (곡에 맞춰 바꿔)
+        var beatInterval = 60000 / bpm / 1000;  // 초 단위 간격
+
+        function preload() {
+            // 무료 음악 넣어라 (ogg/mp3). GitHub에 assets/music.ogg 올려
+            this.load.audio('music', 'assets/music.ogg');
+            this.load.image('note', 'assets/note.png');  // 노트 이미지 (32x32 png 만들어)
+        }
+
+        function create() {
+            music = this.sound.add('music');
+            music.play();
+
+            // 히트 존: 화면 아래 4개 (터치로 누름)
+            for(let i=0; i<4; i++) {
+                let zone = this.add.rectangle(150 + i*150, 500, 100, 100, 0x00ff00).setInteractive();
+                zone.on('pointerdown', () => hitNote(i));  // 터치/클릭 시 히트 체크
+            }
+
+            // 노트 생성 타이머 (비트마다)
+            this.time.addEvent({ delay: beatInterval*1000, callback: spawnNote, callbackScope: this, loop: true });
+        }
+
+        function spawnNote() {
+            let lane = Phaser.Math.Between(0,3);  // 4레인 랜덤
+            let note = this.add.image(150 + lane*150, 0, 'note').setScale(0.5);
+            notes.push({ sprite: note, lane: lane, time: 0 });
+        }
+
+        function update(time, delta) {
+            for(let i=notes.length-1; i>=0; i--) {
+                let note = notes[i];
+                note.sprite.y += 300 * delta / 1000;  // 아래로 떨어짐 (속도 조절)
+                note.time += delta / 1000;
+
+                // 히트 존 지나면 미스
+                if(note.sprite.y > 600) {
+                    note.sprite.destroy();
+                    notes.splice(i,1);
+                    // 점수 깎아
+                }
+            }
+        }
+
+        function hitNote(lane) {
+            // 가장 가까운 노트 체크 (타이밍 ±0.1초)
+            for(let i=0; i<notes.length; i++) {
+                let note = notes[i];
+                if(note.lane === lane && note.time < 0.1) {  // 퍼펙트!
+                    note.sprite.destroy();
+                    notes.splice(i,1);
+                    return;  // 점수 올려!
+                }
+            }
+        }
+    </script>
 </body>
 </html>
