@@ -1,91 +1,122 @@
-<<!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="ko">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <title>리듬 게임</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.js"></script>  <!-- Phaser 3 최신 -->
-    <style> body { margin: 0; padding: 0; background: black; } </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>숫자 맞추기 게임</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      background: #111;
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    /* 가로 전용 강제 (세로 막기) */
+    @media (orientation: portrait) {
+      body::before {
+        content: "가로로 돌려주세요 ㅡㅡ";
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.9);
+        color: white;
+        font-size: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+    }
+    .game {
+      text-align: center;
+      padding: 2rem;
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      max-width: 90vw;
+    }
+    input, button {
+      font-size: 1.5rem;
+      padding: 0.8rem 1.2rem;
+      margin: 0.5rem;
+      background: #000;
+      color: #0f0;
+      border: 1px solid #0f0;
+    }
+    button:hover {
+      background: #0f0;
+      color: black;
+      cursor: pointer;
+    }
+    #message {
+      font-size: 1.8rem;
+      margin: 1.5rem 0;
+      min-height: 2.5rem;
+    }
+  </style>
 </head>
 <body>
-    <script>
-        var config = {
-            type: Phaser.AUTO,
-            width: 800,  // 가로 기준
-            height: 600,
-            scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH,
-                orientationTarget: 1  // 1=가로 고정! 모바일에서 세로면 돌아가라고 팝업 뜸
-            },
-            input: {
-                touch: true,  // 모바일 터치 켜기
-                mouse: true
-            },
-            backgroundColor: '#000000',
-            physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-            scene: { preload: preload, create: create, update: update }
-        };
+  <div class="game">
+    <h1>1 \~ 100 숫자 맞추기</h1>
+    <p>내가 생각한 숫자를 맞춰봐라</p>
+    
+    <input type="number" id="guess" placeholder="숫자 입력" min="1" max="100"/>
+    <button onclick="checkGuess()">맞춰보기</button>
+    
+    <div id="message"></div>
+    <p>남은 기회: <span id="chance">10</span></p>
+    <button onclick="resetGame()" style="display:none;" id="resetBtn">다시하기</button>
+  </div>
 
-        var game = new Phaser.Game(config);
-        var notes = [];  // 노트 배열
-        var hitZone;     // 히트 존 (터치할 곳)
-        var music;       // 음악
-        var bpm = 120;   // 분당 비트 (곡에 맞춰 바꿔)
-        var beatInterval = 60000 / bpm / 1000;  // 초 단위 간격
+  <script>
+    let target = Math.floor(Math.random() * 100) + 1;
+    let chance = 10;
 
-        function preload() {
-            // 무료 음악 넣어라 (ogg/mp3). GitHub에 assets/music.ogg 올려
-            this.load.audio('music', 'assets/music.ogg');
-            this.load.image('note', 'assets/note.png');  // 노트 이미지 (32x32 png 만들어)
-        }
+    function checkGuess() {
+      const guess = Number(document.getElementById("guess").value);
+      const msg = document.getElementById("message");
+      const chanceEl = document.getElementById("chance");
 
-        function create() {
-            music = this.sound.add('music');
-            music.play();
+      if (!guess || guess < 1 || guess > 100) {
+        msg.textContent = "1\~100 사이로 입력해라 새끼야";
+        return;
+      }
 
-            // 히트 존: 화면 아래 4개 (터치로 누름)
-            for(let i=0; i<4; i++) {
-                let zone = this.add.rectangle(150 + i*150, 500, 100, 100, 0x00ff00).setInteractive();
-                zone.on('pointerdown', () => hitNote(i));  // 터치/클릭 시 히트 체크
-            }
+      chance--;
+      chanceEl.textContent = chance;
 
-            // 노트 생성 타이머 (비트마다)
-            this.time.addEvent({ delay: beatInterval*1000, callback: spawnNote, callbackScope: this, loop: true });
-        }
+      if (guess === target) {
+        msg.textContent = "오 맞췄네? 천재새끼";
+        msg.style.color = "#0f0";
+        document.getElementById("resetBtn").style.display = "inline-block";
+      } else if (chance <= 0) {
+        msg.textContent = `Game Over... 정답은 ${target}였음 ㅅㄱ`;
+        msg.style.color = "red";
+        document.getElementById("resetBtn").style.display = "inline-block";
+      } else if (guess > target) {
+        msg.textContent = "너무 크다 임마 ↓";
+        msg.style.color = "orange";
+      } else {
+        msg.textContent = "너무 작다 올려 ↑";
+        msg.style.color = "orange";
+      }
 
-        function spawnNote() {
-            let lane = Phaser.Math.Between(0,3);  // 4레인 랜덤
-            let note = this.add.image(150 + lane*150, 0, 'note').setScale(0.5);
-            notes.push({ sprite: note, lane: lane, time: 0 });
-        }
+      document.getElementById("guess").value = "";
+      document.getElementById("guess").focus();
+    }
 
-        function update(time, delta) {
-            for(let i=notes.length-1; i>=0; i--) {
-                let note = notes[i];
-                note.sprite.y += 300 * delta / 1000;  // 아래로 떨어짐 (속도 조절)
-                note.time += delta / 1000;
-
-                // 히트 존 지나면 미스
-                if(note.sprite.y > 600) {
-                    note.sprite.destroy();
-                    notes.splice(i,1);
-                    // 점수 깎아
-                }
-            }
-        }
-
-        function hitNote(lane) {
-            // 가장 가까운 노트 체크 (타이밍 ±0.1초)
-            for(let i=0; i<notes.length; i++) {
-                let note = notes[i];
-                if(note.lane === lane && note.time < 0.1) {  // 퍼펙트!
-                    note.sprite.destroy();
-                    notes.splice(i,1);
-                    return;  // 점수 올려!
-                }
-            }
-        }
-    </script>
+    function resetGame() {
+      target = Math.floor(Math.random() * 100) + 1;
+      chance = 10;
+      document.getElementById("message").textContent = "";
+      document.getElementById("chance").textContent = chance;
+      document.getElementById("resetBtn").style.display = "none";
+      document.getElementById("guess").value = "";
+    }
+  </script>
 </body>
 </html>
